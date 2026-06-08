@@ -1,2 +1,2 @@
 # borusan
-deneme
+welcome to dva-ada
