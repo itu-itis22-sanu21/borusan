@@ -19,6 +19,18 @@
 %include "&BASE_DIR./autoexec.sas";
 */
 
+/* ---- Hata izolasyonu --------------------------------------------------
+  SAS Studio (Viya) kodu batch modunda çalıştırır. Bu modda ilk ERROR'dan
+  sonra SAS "syntax check" moduna geçer: OBS=0 + NOREPLACE olur, sonraki
+  TÜM adımlar 0 satırla çalışır ve tablolar yazılmaz. Bir kuraldaki hata
+  diğer kuralları da bozmasın diye bunu kapatıyoruz.
+------------------------------------------------------------------------*/
+options nosyntaxcheck obs=max replace;
+
+/* Hata veren dosyaların listesi (en sonda özet olarak basılır) */
+%global _failed_list;
+%let _failed_list = ;
+
 /* ---- Genel sayaç başlat ---------------------------------------------- */
 %let _timer_start = %sysfunc(datetime());
 
@@ -33,10 +45,10 @@
     n      = dosya sayısı
     label  = log'da görünecek grup adı
 
-  Not: Süre ölçümü ve durum kontrolü bilerek DATA _NULL_ adımlarıyla
-  yapılıyor. %sysfunc(datetime()) gibi makro-seviyesi komutlar, include
-  edilen koddaki DATA/PROC adımları henüz çalışmadan değerlendirilebilir;
-  DATA _NULL_ ise include edilen koddan sonra, sırası gelince çalışır.
+  Not: Süre ölçümü ve durum kontrolü DATA _NULL_ adımlarıyla yapılıyor;
+  böylece include edilen koddaki adımlarla aynı sırada çalıştıkları kesin.
+  Zaman damgası metne 20.3 formatıyla yazılıyor; varsayılan dönüşüm
+  kesirli saniyeyi yuvarladığı için negatif süreler çıkıyordu.
 --------------------------------------------------------------------------*/
 %macro run_batch(dir=, prefix=, suffix=, n=, label=);
   %local i num file missing;
@@ -45,7 +57,7 @@
   %put NOTE: ================= &label BAŞLIYOR (&n dosya) =================;
 
   data _null_;
-    call symputx('_grp_start', datetime(), 'G');
+    call symputx('_grp_start', put(datetime(), 20.3), 'G');
   run;
 
   %do i = 1 %to &n;
@@ -53,9 +65,14 @@
     %let file = &dir./&prefix.&num.&suffix..sas;
 
     %if %sysfunc(fileexist(&file)) %then %do;
+      /* Her dosya temiz bir durumla başlasın: önceki dosyanın hatası
+         buna taşınmasın ve SYSCC sadece bu dosyanın sonucunu göstersin */
+      options nosyntaxcheck obs=max replace;
+      %let syscc = 0;
+
       /* Dosya başlangıç zamanı */
       data _null_;
-        call symputx('_file_start', datetime(), 'G');
+        call symputx('_file_start', put(datetime(), 20.3), 'G');
       run;
 
       %put NOTE: >>> Çalıştırılıyor: &file;
@@ -68,8 +85,10 @@
       data _null_;
         dur = datetime() - input(symget('_file_start'), best32.);
         rc  = input(symget('SYSCC'), best32.);
-        if rc > 4 then
-          put "WARNING: <<< &prefix.&num.&suffix bitti ama SYSCC=" rc "(hata olabilir). Süre: " dur time13.2;
+        if rc > 4 then do;
+          put "WARNING: <<< &prefix.&num.&suffix HATA ile bitti (SYSCC=" rc +(-1) "). Süre: " dur time13.2;
+          call symputx('_failed_list', catx(' ', symget('_failed_list'), "&prefix.&num.&suffix"), 'G');
+        end;
         else
           put "NOTE: <<< &prefix.&num.&suffix bitti. Süre: " dur time13.2;
       run;
@@ -95,8 +114,13 @@
 %run_batch(dir=&RULE_DIR,  prefix=rule, suffix=,       n=&RULE_COUNT,  label=KURAL KODLARI);
 
 
-/* ---- Genel sayaç durdur ----------------------------------------------- */
+/* ---- Genel sayaç durdur + hata özeti ---------------------------------- */
+options obs=max replace;
 data _null_;
-  dur = datetime() - &_timer_start;
-  put 30*'-' / ' Input + Rule Jobların Toplam Süresi:' dur time13.2 / 30*'-';
+  dur    = datetime() - &_timer_start;
+  failed = symget('_failed_list');
+  put 50*'-' / ' Input + Rule Jobların Toplam Süresi:' dur time13.2;
+  if missing(failed) then put ' Tüm dosyalar hatasız çalıştı.';
+  else put 'WARNING: Hata veren dosyalar: ' failed;
+  put 50*'-';
 run;
