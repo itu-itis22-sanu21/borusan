@@ -22,6 +22,8 @@
 %let INPUT_COUNT = 22;
 %let RULE_COUNT  = 22;
 %let LATE_INPUTS = 022;   /* boşlukla ayırın, örn: 022 025 */
+%let RULE_PREFIX = CLK_YTK_RULE;
+%let OUTLIB_DEF  = BCCIKTI;
 
 /* Varsa ortak autoexec dosyasını buraya ekleyebilirsiniz:
 %include "&BASE_DIR./autoexec.sas";
@@ -35,6 +37,9 @@
 ------------------------------------------------------------------------*/
 options nosyntaxcheck obs=max replace;
 
+/* Her dosyadan önce RULE / OUTLIB otomatik atanır (bkz. %run_one) */
+%global RULE OUTLIB;
+
 /* Hata veren dosyaların listesi (en sonda özet olarak basılır) */
 %global _failed_list;
 %let _failed_list = ;
@@ -47,17 +52,24 @@ options nosyntaxcheck obs=max replace;
   %run_one : Tek bir dosyayı %include eder; süresini ve hata durumunu yazar.
              Dosya yoksa çağıran makronun &missing sayacını artırır.
 
+  RULE / OUTLIB: Dosyadan önce RULE=CLK_YTK_RULE<num>, OUTLIB=BCCIKTI yapılır.
+  Başında %let RULE olmayan bir dosya eskiden bir ÖNCEKİ dosyanın RULE
+  değeriyle çalışıp başka kuralın RESULT tablosunu silip yeniden
+  oluşturuyordu. Dosya kendi %let RULE'ünü yaparsa o değer geçerli olur.
+
   Not: Süre ölçümü ve durum kontrolü DATA _NULL_ adımlarıyla yapılıyor;
   böylece include edilen koddaki adımlarla aynı sırada çalıştıkları kesin.
   Zaman damgası metne 20.3 formatıyla yazılıyor; varsayılan dönüşüm
   kesirli saniyeyi yuvarladığı için negatif süreler çıkıyordu.
 --------------------------------------------------------------------------*/
-%macro run_one(file=, tag=);
+%macro run_one(file=, tag=, num=);
   %if %sysfunc(fileexist(&file)) %then %do;
     /* Her dosya temiz bir durumla başlasın: önceki dosyanın hatası
        buna taşınmasın ve SYSCC sadece bu dosyanın sonucunu göstersin */
     options nosyntaxcheck obs=max replace;
-    %let syscc = 0;
+    %let syscc  = 0;
+    %let RULE   = &RULE_PREFIX.&num;
+    %let OUTLIB = &OUTLIB_DEF;
 
     data _null_;
       call symputx('_file_start', put(datetime(), 20.3), 'G');
@@ -121,8 +133,8 @@ options nosyntaxcheck obs=max replace;
       %put NOTE: --- &prefix.&num.&suffix ertelendi (kendi kuralından önce çalışacak);
     %else %do;
       %if %index(%str( )&pre_list%str( ), %str( )&num%str( )) %then
-        %run_one(file=&pre_dir./&prefix.&num.&pre_suffix..sas, tag=&prefix.&num.&pre_suffix);
-      %run_one(file=&dir./&prefix.&num.&suffix..sas, tag=&prefix.&num.&suffix);
+        %run_one(file=&pre_dir./&prefix.&num.&pre_suffix..sas, tag=&prefix.&num.&pre_suffix, num=&num);
+      %run_one(file=&dir./&prefix.&num.&suffix..sas, tag=&prefix.&num.&suffix, num=&num);
     %end;
   %end;
 
