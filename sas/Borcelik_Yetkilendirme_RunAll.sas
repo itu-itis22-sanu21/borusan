@@ -19,9 +19,9 @@
 %let BASE_DIR    = /sasdata/Borcelik/05Yetkilendirme;
 %let INPUT_DIR   = &BASE_DIR./inputs;
 %let RULE_DIR    = &BASE_DIR./rules;
-%let INPUT_COUNT = 22;
-%let RULE_COUNT  = 22;
-%let LATE_INPUTS = 022;   /* boşlukla ayırın, örn: 022 025 */
+%let INPUT_COUNT = 21;
+%let RULE_COUNT  = 21;
+%let LATE_INPUTS = ;      /* şimdilik boş. rule022 eklenince: 022 */
 %let RULE_PREFIX = CLK_YTK_RULE;
 %let OUTLIB_DEF  = BCCIKTI;
 
