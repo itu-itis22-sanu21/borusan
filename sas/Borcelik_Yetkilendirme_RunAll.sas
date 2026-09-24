@@ -83,11 +83,13 @@ options nosyntaxcheck obs=max replace;
 
       /* Dosya süresi + hata kontrolü */
       data _null_;
+        length failed $2000;
         dur = datetime() - input(symget('_file_start'), best32.);
         rc  = input(symget('SYSCC'), best32.);
         if rc > 4 then do;
           put "WARNING: <<< &prefix.&num.&suffix HATA ile bitti (SYSCC=" rc +(-1) "). Süre: " dur time13.2;
-          call symputx('_failed_list', catx(' ', symget('_failed_list'), "&prefix.&num.&suffix"), 'G');
+          failed = catx(' ', symget('_failed_list'), "&prefix.&num.&suffix");
+          call symputx('_failed_list', failed, 'G');
         end;
         else
           put "NOTE: <<< &prefix.&num.&suffix bitti. Süre: " dur time13.2;
@@ -117,6 +119,7 @@ options nosyntaxcheck obs=max replace;
 /* ---- Genel sayaç durdur + hata özeti ---------------------------------- */
 options obs=max replace;
 data _null_;
+  length failed $2000;
   dur    = datetime() - &_timer_start;
   failed = symget('_failed_list');
   put 50*'-' / ' Input + Rule Jobların Toplam Süresi:' dur time13.2;
