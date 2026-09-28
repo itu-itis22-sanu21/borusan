@@ -184,16 +184,22 @@ options nosyntaxcheck obs=max replace;
 %mend check_libs;
 %check_libs;
 
-%if &_libs_ok = 1 %then %do;
-  /* ---- 1) Önce tüm INPUT kodları (geç çalışanlar hariç) ---------------- */
-  %run_batch(dir=&INPUT_DIR, prefix=rule, suffix=_input, n=&INPUT_COUNT,
-             label=INPUT KODLARI, skip=&LATE_INPUTS);
+/* Ana akış bir makronun içinde: open code'daki %IF'in içinden %include
+   edilen dosyalar kendi %IF'lerini çalıştıramıyor ("Nesting of %IF
+   statements in open code is not supported"). Makro içinde bu sorun yok. */
+%macro run_all;
+  %if &_libs_ok = 1 %then %do;
+    /* ---- 1) Önce tüm INPUT kodları (geç çalışanlar hariç) ---------------- */
+    %run_batch(dir=&INPUT_DIR, prefix=rule, suffix=_input, n=&INPUT_COUNT,
+               label=INPUT KODLARI, skip=&LATE_INPUTS);
 
-  /* ---- 2) Sonra tüm KURAL kodları (geç input'lar kendi kuralından önce) */
-  %run_batch(dir=&RULE_DIR, prefix=rule, suffix=, n=&RULE_COUNT,
-             label=KURAL KODLARI,
-             pre_dir=&INPUT_DIR, pre_suffix=_input, pre_list=&LATE_INPUTS);
-%end;
+    /* ---- 2) Sonra tüm KURAL kodları (geç input'lar kendi kuralından önce) */
+    %run_batch(dir=&RULE_DIR, prefix=rule, suffix=, n=&RULE_COUNT,
+               label=KURAL KODLARI,
+               pre_dir=&INPUT_DIR, pre_suffix=_input, pre_list=&LATE_INPUTS);
+  %end;
+%mend run_all;
+%run_all;
 
 
 /* ---- Genel sayaç durdur + hata özeti ---------------------------------- */
