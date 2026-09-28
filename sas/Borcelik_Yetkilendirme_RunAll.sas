@@ -40,10 +40,8 @@
                where libname in ('BCETL','BCCIKTI'); quit;
   ve aşağıdaki satırları buna göre doldurup yorumdan çıkarın.
 ------------------------------------------------------------------------*/
-/*
-libname BCETL   "<BCETL yolu>";
-libname BCCIKTI "<BCCIKTI yolu>";
-*/
+libname BCETL   V9 "/sasdata/Borcelik/01Tablolarcelik/BCETL";
+libname BCCIKTI V9 "/sasdata/Borcelik/01Tablolarcelik/BC_CIKTI";
 %let REQUIRED_LIBS = BCETL BCCIKTI;
 
 /* ---- Hata izolasyonu --------------------------------------------------
