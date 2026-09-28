@@ -29,6 +29,23 @@
 %include "&BASE_DIR./autoexec.sas";
 */
 
+/* ---- Kütüphaneler -----------------------------------------------------
+  Input/kural kodları BCETL (kaynak) ve BCCIKTI (sonuç) kütüphanelerini
+  kullanır. Kod SAS Studio'da elle çalışırken bunlar oturumda tanımlı
+  olabilir; ama JOB / zamanlanmış çalıştırma YENİ bir oturum açar ve
+  tanımlar gelmez ("Libref BCETL is not assigned"). Bu yüzden LIBNAME
+  satırları burada olmalı. Doğru tanımı öğrenmek için kütüphanelerin
+  çalıştığı bir SAS Studio oturumunda şunu çalıştırın:
+     proc sql; select libname, engine, path from dictionary.libnames
+               where libname in ('BCETL','BCCIKTI'); quit;
+  ve aşağıdaki satırları buna göre doldurup yorumdan çıkarın.
+------------------------------------------------------------------------*/
+/*
+libname BCETL   "<BCETL yolu>";
+libname BCCIKTI "<BCCIKTI yolu>";
+*/
+%let REQUIRED_LIBS = BCETL BCCIKTI;
+
 /* ---- Hata izolasyonu --------------------------------------------------
   SAS Studio (Viya) kodu batch modunda çalıştırır. Bu modda ilk ERROR'dan
   sonra SAS "syntax check" moduna geçer: OBS=0 + NOREPLACE olur, sonraki
@@ -146,14 +163,39 @@ options nosyntaxcheck obs=max replace;
 %mend run_batch;
 
 
-/* ---- 1) Önce tüm INPUT kodları (geç çalışanlar hariç) ------------------ */
-%run_batch(dir=&INPUT_DIR, prefix=rule, suffix=_input, n=&INPUT_COUNT,
-           label=INPUT KODLARI, skip=&LATE_INPUTS);
+/*--------------------------------------------------------------------------
+  %check_libs : &REQUIRED_LIBS içindeki her kütüphane tanımlı mı?
+                libref() 0 dönerse tanımlıdır. Eksik varsa hiçbir dosya
+                çalıştırılmaz; 42 dosyanın hepsinin aynı sebeple düşüp
+                log'u hatayla doldurması yerine tek, net bir mesaj basılır.
+--------------------------------------------------------------------------*/
+%macro check_libs;
+  %global _libs_ok _missing_libs;
+  %local i lib;
+  %let _missing_libs = ;
+  %do i = 1 %to %sysfunc(countw(&REQUIRED_LIBS));
+    %let lib = %scan(&REQUIRED_LIBS, &i);
+    %if %sysfunc(libref(&lib)) ne 0 %then %let _missing_libs = &_missing_libs &lib;
+  %end;
+  %if %length(&_missing_libs) %then %do;
+    %let _libs_ok = 0;
+    %put ERROR: Kütüphane tanımlı değil:&_missing_libs.. Hiçbir dosya çalıştırılmadı.;
+    %put ERROR- Runner başındaki LIBNAME satırlarını doldurun (bkz. "Kütüphaneler" bölümü).;
+  %end;
+  %else %let _libs_ok = 1;
+%mend check_libs;
+%check_libs;
 
-/* ---- 2) Sonra tüm KURAL kodları (geç input'lar kendi kuralından önce) -- */
-%run_batch(dir=&RULE_DIR, prefix=rule, suffix=, n=&RULE_COUNT,
-           label=KURAL KODLARI,
-           pre_dir=&INPUT_DIR, pre_suffix=_input, pre_list=&LATE_INPUTS);
+%if &_libs_ok = 1 %then %do;
+  /* ---- 1) Önce tüm INPUT kodları (geç çalışanlar hariç) ---------------- */
+  %run_batch(dir=&INPUT_DIR, prefix=rule, suffix=_input, n=&INPUT_COUNT,
+             label=INPUT KODLARI, skip=&LATE_INPUTS);
+
+  /* ---- 2) Sonra tüm KURAL kodları (geç input'lar kendi kuralından önce) */
+  %run_batch(dir=&RULE_DIR, prefix=rule, suffix=, n=&RULE_COUNT,
+             label=KURAL KODLARI,
+             pre_dir=&INPUT_DIR, pre_suffix=_input, pre_list=&LATE_INPUTS);
+%end;
 
 
 /* ---- Genel sayaç durdur + hata özeti ---------------------------------- */
@@ -163,7 +205,9 @@ data _null_;
   dur    = datetime() - &_timer_start;
   failed = symget('_failed_list');
   put 50*'-' / ' Input + Rule Jobların Toplam Süresi:' dur time13.2;
-  if missing(failed) then put ' Tüm dosyalar hatasız çalıştı.';
+  if symget('_libs_ok') ne '1' then
+    put "ERROR: Çalıştırma yapılmadı, eksik kütüphane:&_missing_libs";
+  else if missing(failed) then put ' Tüm dosyalar hatasız çalıştı.';
   else put 'WARNING: Hata veren dosyalar: ' failed;
   put 50*'-';
 run;
