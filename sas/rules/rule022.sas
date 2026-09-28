@@ -10,10 +10,7 @@
    Her kural dosyası kendi parametrelerini kendisi tanımlamalı. */
 %let RULE   = CLK_YTK_RULE022;
 %let OUTLIB = BCCIKTI;
-%global BATCH_ID;
-%if %superq(BATCH_ID) = %then %do;
-  %let BATCH_ID = 1;              /* rule022_input.sas ile aynı değer */
-%end;
+%let BATCH_ID = 1;              /* rule022_input.sas ile aynı değer */
 
 /* 1) TABLOYU ZORLA TEMİZLE */
 proc datasets lib=&OUTLIB. nolist;

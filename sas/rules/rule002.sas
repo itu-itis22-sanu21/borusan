@@ -10,15 +10,12 @@
 %let RULE   = CLK_YTK_RULE002;   /* Eskiden rule001'den kalan değer kullanılıyordu */
 %let OUTLIB = BCCIKTI;
 
-/* BATCH_ID: rule001'de nasıl üretiliyorsa AYNISINI buraya koyun.
-   Tanımlı değilse yedek olarak datetime() (sayısal) kullanılır; böylece
-   "&BATCH_ID." çözülmeden SQL'e girip ERROR 22-322 vermez.
+/* BATCH_ID: projedeki diğer input/kural kodları gibi sabit 1.
+   (Burada bilerek %IF kullanılmıyor: open code'da iç içe %IF
+   desteklenmediği için include edildiği yere göre hata verebiliyor.)
    NOT: RESULT tablosunda BATCH_ID karakter ise değeri tırnakla verin:
         "&BATCH_ID." as BATCH_ID                                         */
-%global BATCH_ID;
-%if %superq(BATCH_ID) = %then %do;
-  %let BATCH_ID = %sysfunc(datetime(), 16.);
-%end;
+%let BATCH_ID = 1;              /* input kodlarıyla aynı değer */
 %put NOTE: &RULE çalışıyor. BATCH_ID=&BATCH_ID;
 
 /* 2) ALERTED ROWS: Sadece riskli bulguları ara tabloya taşıyoruz */
