@@ -21,6 +21,7 @@
 /* 2) ALERTED ROWS: Sadece riskli bulguları ara tabloya taşıyoruz */
 data WORK.&RULE._ALERTED_ROWS;
     set WORK.&RULE._ANALYSIS;
+    where FLAG_RISKLI = 1;   /* input tüm kullanıcıları taşıyor (riskli olmayanlar FLAG_RISKLI=0) */
 run;
 
 /* 3) VERİ TEMİZLİĞİ: Mevcut RESULT tablosunu drop etmeden içini truncate ediyoruz */
